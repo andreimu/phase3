@@ -5,17 +5,36 @@ on:
     branches:
       - main
       - master
-  pull_request:
+  workflow_dispatch:
 
 jobs:
-  lint:
+  build:
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/myimage-flask:v0.${{github.run_number}}
+  test:
+    runs-on: ubuntu-latest
+    needs: build
     strategy:
       matrix:
         python-version: [3.9, 3.11, 3.12]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
@@ -29,3 +48,13 @@ jobs:
 
       - name: Run pylint
         run: pylint app.py --output-format=parseable
+  deploy:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy application
+        run: |
+          echo "Deploying the application..."
